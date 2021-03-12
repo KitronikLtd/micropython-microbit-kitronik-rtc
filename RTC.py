@@ -53,7 +53,7 @@ class KitronikRTC:
         tens = 0
         units = 0
         bcdNumber = 0
-        tens = decNumber / 10
+        tens = decNumber // 10
         units = decNumber % 10
         bcdNumber = (tens << 4) | units
         return bcdNumber
@@ -65,13 +65,13 @@ class KitronikRTC:
         tens = 0
         decNumber = 0
         if readReg == self.RTC_SECONDS_REG:
-            mask = 0x30
+            mask = 0x70
         elif readReg is self.RTC_MINUTES_REG:
             mask = 0x70
         elif readReg is self.RTC_DAY_REG:
             mask = 0x30
         elif readReg is self.RTC_HOURS_REG:
-            mask = 0x10
+            mask = 0x30
         elif readReg is self.RTC_MONTH_REG:
             mask = 0x10
         elif readReg is self.RTC_YEAR_REG:
@@ -173,7 +173,9 @@ class KitronikRTC:
         writeBuf[0] = self.RTC_SECONDS_REG
         writeBuf[1] = self.START_RTC | readCurrentSeconds
         i2c.write(self.CHIP_ADDRESS, writeBuf, False)
-
+        
+rtc = KitronikRTC
+rtc.setTime(rtc,6,0,0)
+rtc.setDate(rtc, 5,11,55)
 while True:
-    rtc = KitronikRTC
     display.scroll(rtc.readTimeAndDate(rtc))
