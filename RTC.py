@@ -50,37 +50,10 @@ class KitronikRTC:
         self.initalised = True
 
     def decToBcd(self, decNumber):
-        tens = 0
-        units = 0
-        bcdNumber = 0
         tens = decNumber // 10
         units = decNumber % 10
         bcdNumber = (tens << 4) | units
         return bcdNumber
-
-    def bcdToDec(self, bcdNumber, readReg):
-        mask = 0
-        shiftedTens = 0
-        units = 0
-        tens = 0
-        decNumber = 0
-        if readReg == self.RTC_SECONDS_REG:
-            mask = 0x70
-        elif readReg is self.RTC_MINUTES_REG:
-            mask = 0x70
-        elif readReg is self.RTC_DAY_REG:
-            mask = 0x30
-        elif readReg is self.RTC_HOURS_REG:
-            mask = 0x30
-        elif readReg is self.RTC_MONTH_REG:
-            mask = 0x10
-        elif readReg is self.RTC_YEAR_REG:
-            mask = 0xF0
-        units = bcdNumber & 0x0F
-        tens = bcdNumber & mask
-        shiftedTens = tens >> 4
-        decNumber = (shiftedTens * 10) + units
-        return decNumber
         
     def readValue(self): 
         if self.initalised is False:
@@ -91,13 +64,13 @@ class KitronikRTC:
         writeBuf[0] = self.RTC_SECONDS_REG
         i2c.write(self.CHIP_ADDRESS, writeBuf, False)
         readBuf = i2c.read(self.CHIP_ADDRESS, 7, False)
-        self.currentSeconds = readBuf[0]
-        self.currentMinutes = readBuf[1]
-        self.currentHours = readBuf[2]
+        self.currentSeconds = (((readBuf[0] & 0x70) >> 4) * 10) + (readBuf[0] & 0x0F)
+        self.currentMinutes = (((readBuf[1] & 0x70) >> 4) * 10) + (readBuf[1] & 0x0F)
+        self.currentHours = (((readBuf[2] & 0x30) >> 4) * 10) + (readBuf[2] & 0x0F)
         self.currentWeekDay = readBuf[3]
-        self.currentDay = readBuf[4]
-        self.currentMonth = readBuf[5]
-        self.currentYear = readBuf[6]
+        self.currentDay = (((readBuf[4] & 0x30) >> 4) * 10) + (readBuf[4] & 0x0F)
+        self.currentMonth =(((readBuf[5] & 0x10) >> 4) * 10) + (readBuf[5] & 0x0F) 
+        self.currentYear = (((readBuf[6] & 0xF0) >> 4) * 10) + (readBuf[6] & 0x0F)
         
     def setTime(self, setHours, setMinutes, setSeconds): 
         if self.initalised is False:
@@ -123,13 +96,19 @@ class KitronikRTC:
         if self.initalised is False:
             self.init(self)
         self.readValue(self)
-        decSeconds = str(self.bcdToDec(self, self.currentSeconds, self.RTC_SECONDS_REG))
-        decMinutes = str(self.bcdToDec(self, self.currentMinutes, self.RTC_MINUTES_REG))
-        decHours = str(self.bcdToDec(self, self.currentHours, self.RTC_HOURS_REG))
-        decDay = str(self.bcdToDec(self, self.currentDay, self.RTC_DAY_REG))
-        decMonths = str(self.bcdToDec(self, self.currentMonth, self.RTC_MONTH_REG))
-        decYears = str(self.bcdToDec(self, self.currentYear, self.RTC_YEAR_REG))
-        timeAndDate = "" + (decHours) + ":" + (decMinutes) + ":" + (decSeconds) + "   " + (decDay) + "/" + (decMonths) + "/" + (decYears)
+        if self.currentHours <= 9:
+            hourString = "0" + str(self.currentHours)
+        else:
+            hourString = str(self.currentHours)
+        if self.currentHours <= 9:
+            minuteString = "0" + str(self.currentMinutes)
+        else:
+            minuteString = str(self.currentMinutes)
+        if self.currentSeconds <= 9:
+            secString = "0" + str(self.currentSeconds)
+        else:
+            secString = str(self.currentSeconds)
+        timeAndDate = "" + hourString + ":" + minuteString + ":" + secString + "   " + str(self.currentDay) + "/" + str(self.currentMonth) + "/" + str(self.currentYear)
         return timeAndDate
 
     def setDate(self, setDay, setMonth, setYear): 
@@ -137,11 +116,8 @@ class KitronikRTC:
             self.init(self)
         leapYearCheck = 0
         writeBuf = bytearray(2)
+        readReqBuf = bytearray(1)
         readBuf = bytearray(1)
-        bcdDay = 0
-        bcdMonths = 0
-        bcdYears = 0
-        readCurrentSeconds = 0
         if setMonth is 4 or 6 or 9 or 11:
             if setDay is 30:
                 setDay = 30
@@ -154,10 +130,11 @@ class KitronikRTC:
         bcdDay = self.decToBcd(self, setDay)
         bcdMonths = self.decToBcd(self, setMonth)
         bcdYears = self.decToBcd(self, setYear)
-        writeBuf[0] = self.RTC_SECONDS_REG
-        i2c.write(self.CHIP_ADDRESS, writeBuf, False)
+        readReqBuf[0] = self.RTC_SECONDS_REG
+        i2c.write(self.CHIP_ADDRESS, readReqBuf, False)
         readBuf = i2c.read(self.CHIP_ADDRESS, 1, False)
         readCurrentSeconds = readBuf[0]
+        print(readCurrentSeconds)
         writeBuf[0] = self.RTC_SECONDS_REG
         writeBuf[1] = self.STOP_RTC
         i2c.write(self.CHIP_ADDRESS, writeBuf, False)
@@ -175,7 +152,7 @@ class KitronikRTC:
         i2c.write(self.CHIP_ADDRESS, writeBuf, False)
         
 rtc = KitronikRTC
-rtc.setTime(rtc,6,0,0)
+rtc.setTime(rtc,6,4,20)
 rtc.setDate(rtc, 5,11,55)
 while True:
     display.scroll(rtc.readTimeAndDate(rtc))
